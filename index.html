@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Calculadora de Nafta con GPS</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      max-width: 400px;
+      margin: auto;
+    }
+
+    input, button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+    }
+
+    #resultado, #gps-info {
+      margin-top: 20px;
+      font-weight: bold;
+    }
+
+    .medidor {
+      position: relative;
+      width: 200px;
+      height: 100px;
+      margin: 40px auto;
+    }
+
+    .esfera {
+      width: 100%;
+      height: 100%;
+      background: #ddd;
+      border-radius: 100px 100px 0 0;
+      position: relative;
+      overflow: hidden;
+      border: 2px solid #333;
+    }
+
+    .aguja {
+      width: 4px;
+      height: 90px;
+      background: red;
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform-origin: bottom center;
+      transform: rotate(-90deg);
+      transition: transform 1s ease-in-out;
+    }
+
+    .etiquetas {
+      display: flex;
+      justify-content: space-between;
+      padding: 0 10px;
+      margin-top: 5px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Calculadora de Nafta</h2>
+
+  <label for="importe">Importe ($):</label>
+  <input type="number" id="importe" placeholder="Ej: 5000">
+
+  <label for="precio">Precio por litro ($):</label>
+  <input type="number" id="precio" placeholder="Ej: 950">
+
+  <button onclick="calcular()">Calcular</button>
+  <div id="resultado"></div>
+
+  <div class="medidor">
+    <div class="esfera">
+      <div class="aguja" id="aguja"></div>
+    </div>
+    <div class="etiquetas">
+      <span>Vacío</span>
+      <span>Lleno</span>
+    </div>
+  </div>
+
+  <hr>
+
+  <h3>Seguimiento GPS</h3>
+  <button onclick="registrarInicio()">Registrar punto de inicio</button>
+  <button onclick="registrarFin()">Registrar punto de llegada</button>
+
+  <div id="gps-info"></div>
+
+  <script>
+    const capacidadTanque = 50; // litros máximos
+    const consumoPorKm = 0.1; // 10 km/l => 0.1 l/km
+
+    let puntoInicio = null;
+    let puntoFin = null;
+
+    function calcular() {
+      const importe = parseFloat(document.getElementById('importe').value);
+      const precio = parseFloat(document.getElementById('precio').value);
+      const resultado = document.getElementById('resultado');
+      const aguja = document.getElementById('aguja');
+
+      if (isNaN(importe) || isNaN(precio) || precio <= 0) {
+        resultado.textContent = "Por favor, ingrese valores válidos.";
+        return;
+      }
+
+      const litros = importe / precio;
+      resultado.textContent = `Podés cargar ${litros.toFixed(2)} litros de nafta.`;
+
+      const porcentaje = Math.min(litros / capacidadTanque, 1);
+      const angulo = -90 + (porcentaje * 180);
+      aguja.style.transform = `rotate(${angulo}deg)`;
+    }
+
+    function registrarInicio() {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(pos => {
+          puntoInicio = {
+            lat: pos.coords.latitude,
+            lon: pos.coords.longitude
+          };
+          mostrarMensaje("Inicio registrado", puntoInicio);
+        }, error => {
+          alert("Error al obtener ubicación: " + error.message);
+        });
+      } else {
+        alert("Geolocalización no soportada por este navegador.");
+      }
+    }
+
+    function registrarFin() {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(pos => {
+          puntoFin = {
+            lat: pos.coords.latitude,
+            lon: pos.coords.longitude
+          };
+          mostrarMensaje("Destino registrado", puntoFin);
+          calcularDistanciaYConsumo();
+        }, error => {
+          alert("Error al obtener ubicación: " + error.message);
+        });
+      } else {
+        alert("Geolocalización no soportada por este navegador.");
+      }
+    }
+
+    function mostrarMensaje(titulo, punto) {
+      const gpsInfo = document.getElementById('gps-info');
+      gpsInfo.innerHTML += `<p><strong>${titulo}:</strong> Lat: ${punto.lat.toFixed(5)}, Lon: ${punto.lon.toFixed(5)}</p>`;
+    }
+
+    function calcularDistanciaYConsumo() {
+      if (puntoInicio && puntoFin) {
+        const distanciaKm = haversine(puntoInicio.lat, puntoInicio.lon, puntoFin.lat, puntoFin.lon);
+        const litrosUsados = distanciaKm * consumoPorKm;
+        const gpsInfo = document.getElementById('gps-info');
+
+        gpsInfo.innerHTML += `
+          <p><strong>Distancia estimada:</strong> ${distanciaKm.toFixed(2)} km</p>
+          <p><strong>Consumo estimado:</strong> ${litrosUsados.toFixed(2)} litros</p>
+        `;
+      }
+    }
+
+    // Función Haversine para calcular distancia entre dos coordenadas
+    function haversine(lat1, lon1, lat2, lon2) {
+      const R = 6371; // km
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    }
+
+    function toRad(degrees) {
+      return degrees * Math.PI / 180;
+    }
+  </script>
+</body>
+</html>
